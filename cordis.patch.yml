@@ -1,0 +1,11 @@
+# dsh-session-keepwarm bundle patch: inserts the client-side keep-warm plugin.
+#
+# DSH 0.1.7's client keeps a session resident only while a `SessionReference`
+# is outstanding; a main-view switch releases the outgoing session and the
+# last release tears its history window down, so switching back re-reads the
+# first history page. This plugin holds one extra reference (source
+# `sessionKeepwarm`) for the most recently used sessions, capped by its
+# `keepWarm` setting.
+- insert:
+    - id: session-keepwarm
+      name: dsh-session-keepwarm
