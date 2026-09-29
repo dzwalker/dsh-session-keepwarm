@@ -55,7 +55,10 @@ The settings form is derived from this plugin's Config schema (profile entry id 
 dsh plugin --profile web add dsh-session-keepwarm
 ```
 
-Then enable it in the profile. The plugin needs DSH `0.1.7` or newer.
+Then enable it in the profile. The plugin declares its host contract as
+`@deepseek-ai/dsh-api-session-controller` `^0.1.7-rc.2 || ^0.2.0-rc.1` — the range the
+dsh startup gate and the plugin market read — and is tested on DSH `0.1.7-rc.2` and
+`0.2.0-rc.1`.
 
 ### Build
 
@@ -120,7 +123,9 @@ turn），界面上就是「载入历史」。
 dsh plugin --profile web add dsh-session-keepwarm
 ```
 
-然后在 profile 里启用。需要 DSH `0.1.7` 或更新版本。
+然后在 profile 里启用。插件把宿主契约声明为 `@deepseek-ai/dsh-api-session-controller`
+的 `^0.1.7-rc.2 || ^0.2.0-rc.1`（dsh 启动门禁与插件市场都读这个范围），已在 DSH
+`0.1.7-rc.2` 与 `0.2.0-rc.1` 实测。
 
 ### 构建
 

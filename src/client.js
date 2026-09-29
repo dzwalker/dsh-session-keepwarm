@@ -62,10 +62,17 @@ window.__ModuleLoader__.load({ id: 'dsh-session-keepwarm', factory: () => {
 
     /** session id -> held reference. */
     const held = new Map()
+    /** Ids whose `retain` call is still on the stack; see `hold`. */
+    const holding = new Set()
     /** LRU order, most recently active first. */
     const warm = []
     /** Ids that carried a mainView reference in the previous list snapshot. */
     let active = new Set()
+    /** Re-entrancy guard and pending-rerun flag for `sync`. */
+    let syncing = false
+    let dirty = false
+    /** Whether a subscription burst already queued one deferred reconcile. */
+    let scheduled = false
 
     /** Read the live form snapshot; failures fall back to the defaults. */
     const readConfig = () => {
@@ -97,9 +104,16 @@ window.__ModuleLoader__.load({ id: 'dsh-session-keepwarm', factory: () => {
       warm.length = 0
     }
 
-    /** Acquire one reference and keep unhandled open rejections off the console. */
+    /**
+     * Acquire one reference and keep unhandled open rejections off the console.
+     *
+     * `sessions.retain` publishes to `sessions.list` synchronously, so the list
+     * subscriber can re-enter this call before it returns; the in-flight marker
+     * must therefore be set before `retain`, not after it.
+     */
     const hold = (id) => {
-      if (held.has(id)) return
+      if (held.has(id) || holding.has(id)) return
+      holding.add(id)
       try {
         const reference = sessions.retain(id, { source: SOURCE })
         held.set(id, reference)
@@ -108,6 +122,8 @@ window.__ModuleLoader__.load({ id: 'dsh-session-keepwarm', factory: () => {
         void reference.ready.catch(() => {})
       } catch (error) {
         console.error('[session-keepwarm] retain failed:', id, error)
+      } finally {
+        holding.delete(id)
       }
     }
 
@@ -129,8 +145,8 @@ window.__ModuleLoader__.load({ id: 'dsh-session-keepwarm', factory: () => {
       trim()
     }
 
-    /** Reconcile the LRU with the list snapshot. */
-    const sync = () => {
+    /** Reconcile the LRU with the list snapshot once. */
+    const reconcile = () => {
       if (!enabled) {
         dropAll()
         active = new Set()
@@ -152,9 +168,42 @@ window.__ModuleLoader__.load({ id: 'dsh-session-keepwarm', factory: () => {
       trim()
     }
 
+    /**
+     * Reconcile under a re-entrancy guard: holding a reference publishes to the
+     * session list, so a reconcile can run inside another one. A suppressed call
+     * marks the state dirty and the running call reconciles again once it can.
+     */
+    const sync = () => {
+      if (syncing) { dirty = true; return }
+      syncing = true
+      try {
+        do {
+          dirty = false
+          reconcile()
+        } while (dirty)
+      } finally {
+        syncing = false
+      }
+    }
+
+    /**
+     * Defer one reconcile out of the notification stack that asked for it.
+     * Retaining inside the publisher's own notify loop is what makes the
+     * keep-warm loop re-enter itself; a microtask keeps publishers and
+     * subscribers in separate stacks, and bursts collapse into one reconcile.
+     */
+    const schedule = () => {
+      if (scheduled) return
+      scheduled = true
+      queueMicrotask(() => {
+        scheduled = false
+        try { sync() } catch (error) { console.error('[session-keepwarm] sync failed:', error) }
+      })
+    }
+
     readConfig()
-    ctx.effect(() => form.subscribe(() => { readConfig(); sync() }), 'session-keepwarm: config')
-    ctx.effect(() => sessions.list.subscribe(() => { sync() }), 'session-keepwarm: session list')
+    ctx.effect(() => form.subscribe(() => { readConfig(); schedule() }), 'session-keepwarm: config')
+    ctx.effect(() => sessions.list.subscribe(() => { schedule() }), 'session-keepwarm: session list')
     ctx.effect(() => () => { dropAll() }, 'session-keepwarm: teardown')
     sync()
   }

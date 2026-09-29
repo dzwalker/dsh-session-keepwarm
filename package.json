@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-keepwarm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Keeps the most recently used sessions resident in the browser, so switching back reuses the loaded history instead of re-reading it.",
   "type": "module",
   "main": "lib/host.js",
@@ -40,10 +40,14 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-api-session-controller": "^0.1.7-rc.2 || ^0.2.0-rc.1",
     "@deepseek-ai/schemastery": "^3.18.1"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "dsh": {
     "bundle": {
@@ -51,11 +55,6 @@
     },
     "client": {
       "platform": "web"
-    },
-    "compatibility": {
-      "dshReleases": {
-        "0.1.7-rc.2": "compatible"
-      }
     }
   }
 }
